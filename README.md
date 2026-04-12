@@ -11,7 +11,6 @@ This project implements the Phase 1 MVP from `Master.md`:
 ## 1. Setup
 
 ```bash
-cd recommender
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -29,6 +28,7 @@ pip install git+https://github.com/openai/CLIP.git
 python pipeline/simulate_users.py
 python pipeline/embed_items.py
 python pipeline/build_index.py
+python pipeline/prepare_training_data.py
 ```
 
 ## 3. Run API

@@ -13,6 +13,9 @@ FAISS_INDEX_PATH = PROCESSED_DIR / "faiss.index"
 DB_PATH = DATA_DIR / "metadata.db"
 RUNS_DIR = PROCESSED_DIR / "runs"
 CHECKPOINTS_DIR = PROCESSED_DIR / "checkpoints"
+TRAIN_DATA_DIR = PROCESSED_DIR / "training"
+TRAIN_PAIRS_PATH = TRAIN_DATA_DIR / "train_pairs.jsonl"
+VAL_PAIRS_PATH = TRAIN_DATA_DIR / "val_pairs.jsonl"
 
 # Model
 CLIP_MODEL_NAME = "ViT-B/32"
