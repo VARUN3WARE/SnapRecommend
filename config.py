@@ -11,6 +11,8 @@ EMBEDDINGS_PATH = PROCESSED_DIR / "item_embeddings.npy"
 ITEM_IDS_PATH = PROCESSED_DIR / "item_ids.npy"
 FAISS_INDEX_PATH = PROCESSED_DIR / "faiss.index"
 DB_PATH = DATA_DIR / "metadata.db"
+RUNS_DIR = PROCESSED_DIR / "runs"
+CHECKPOINTS_DIR = PROCESSED_DIR / "checkpoints"
 
 # Model
 CLIP_MODEL_NAME = "ViT-B/32"
@@ -36,6 +38,19 @@ LEARNING_RATE = 1e-4
 BATCH_SIZE = 128
 EPOCHS = 20
 DEVICE = "cuda"
+SEED = 42
+
+# Phase mode
+PHASE_MODE = "phase1"  # allowed: phase1, phase2
+USE_RANKER = False
+
+# Phase 2 training defaults
+TRAIN_SPLIT = 0.8
+NEGATIVE_SAMPLES = 4
+TWO_TOWER_HIDDEN_DIM = 512
+TWO_TOWER_DROPOUT = 0.1
+RANKER_HIDDEN_DIMS = (256, 64)
+RANKER_DROPOUT = 0.2
 
 # API
 MAX_INPUT_IMAGE_PX = 1024

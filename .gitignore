@@ -37,6 +37,8 @@ data/processed/*.npy
 data/processed/*.index
 data/processed/*.faiss
 data/processed/*.bin
+data/processed/runs/
+data/processed/checkpoints/
 
 # Databases
 data/*.db
