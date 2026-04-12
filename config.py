@@ -31,6 +31,9 @@ FAISS_USE_GPU = True
 # User encoder
 MAX_HISTORY_LEN = 20
 INTERACTION_WEIGHTS = {"purchase": 1.0, "click": 0.3, "view": 0.1}
+USER_ENCODER_MODE = "legacy"  # allowed: legacy, transformer
+TRANSFORMER_LAYERS = 2
+TRANSFORMER_HEADS = 8
 
 # Fusion (Phase 1)
 USER_WEIGHT = 0.6
