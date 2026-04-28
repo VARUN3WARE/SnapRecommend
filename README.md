@@ -30,6 +30,7 @@ python pipeline/embed_items.py
 python pipeline/build_index.py
 python pipeline/prepare_training_data.py
 python pipeline/train_two_tower.py --epochs 2 --batch-size 64 --device cpu
+python pipeline/train_ranker.py --epochs 2 --batch-size 64 --device cpu
 ```
 
 ## 3. Run API
