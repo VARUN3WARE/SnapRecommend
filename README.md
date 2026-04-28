@@ -33,6 +33,8 @@ python pipeline/train_two_tower.py --epochs 2 --batch-size 64 --device cpu
 python pipeline/train_ranker.py --epochs 2 --batch-size 64 --device cpu
 ```
 
+To enable Phase 2 serving after training, set `PHASE_MODE = "phase2"` and `USE_RANKER = True` in `config.py`. If you also want the sequence user encoder path, set `USER_ENCODER_MODE = "transformer"`.
+
 ## 3. Run API
 
 ```bash

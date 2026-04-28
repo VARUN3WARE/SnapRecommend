@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -14,7 +15,15 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from config import BATCH_SIZE, CHECKPOINTS_DIR, EMBEDDINGS_PATH, EPOCHS, ITEM_IDS_PATH, LEARNING_RATE
+from config import (
+    BATCH_SIZE,
+    CHECKPOINTS_DIR,
+    EMBEDDINGS_PATH,
+    EPOCHS,
+    ITEM_IDS_PATH,
+    LEARNING_RATE,
+    RANKER_CHECKPOINT_PATH,
+)
 from models.ranker import Ranker, RankerTrainer, build_dataloader
 from pipeline.experiment import (
     ExperimentConfig,
@@ -97,13 +106,15 @@ def main(epochs: int, batch_size: int, learning_rate: float, device: str) -> Non
         ckpt_path,
         metadata={"run_id": run_id, "epochs": epochs, "train_loss": last_train, "val_loss": last_val},
     )
+    shutil.copyfile(ckpt_path, RANKER_CHECKPOINT_PATH)
     mark_run_finished(
         run_id,
         status="completed",
         metrics={"train_loss": last_train, "val_loss": last_val},
-        artifacts={"checkpoint": str(ckpt_path)},
+        artifacts={"checkpoint": str(ckpt_path), "latest_ranker": str(RANKER_CHECKPOINT_PATH)},
     )
     print(f"Saved checkpoint: {ckpt_path}")
+    print(f"Updated latest ranker: {RANKER_CHECKPOINT_PATH}")
 
 
 if __name__ == "__main__":

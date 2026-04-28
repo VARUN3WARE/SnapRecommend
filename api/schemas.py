@@ -43,3 +43,5 @@ class StatusResponse(BaseModel):
     status: str
     index_size: int
     model: str
+    phase_mode: str
+    ranker_loaded: bool
