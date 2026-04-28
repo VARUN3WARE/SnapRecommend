@@ -26,6 +26,8 @@ from config import (
     EMBEDDINGS_PATH,
     FAISS_INDEX_PATH,
     FINAL_TOP_N,
+    HYBRID_IMAGE_WEIGHT,
+    HYBRID_TEXT_WEIGHT,
     ITEM_IDS_PATH,
     MAX_INPUT_IMAGE_PX,
     PHASE_MODE,
@@ -102,6 +104,23 @@ def _decode_image(b64_image: str) -> Image.Image:
 def _category_to_id(category: str) -> float:
     digest = hashlib.sha256(category.encode("utf-8")).digest()
     return int.from_bytes(digest[:4], "little", signed=False) / 2**32
+
+
+def _build_hybrid_query_vector(image_vec: np.ndarray | None, text_vec: np.ndarray | None) -> np.ndarray:
+    if image_vec is None and text_vec is None:
+        raise HTTPException(status_code=422, detail="Provide at least one of image or query")
+
+    if image_vec is None:
+        query_vec = text_vec.astype(np.float32)
+    elif text_vec is None:
+        query_vec = image_vec.astype(np.float32)
+    else:
+        query_vec = HYBRID_IMAGE_WEIGHT * image_vec + HYBRID_TEXT_WEIGHT * text_vec
+
+    norm = np.linalg.norm(query_vec)
+    if norm > 0:
+        query_vec = query_vec / norm
+    return query_vec.astype(np.float32)
 
 
 def _score_candidates_with_ranker(user_vec: np.ndarray, products: list[Product]) -> list[float] | None:
@@ -198,20 +217,16 @@ def recommend_text(payload: RecommendTextRequest):
 
 @app.post("/recommend/hybrid", response_model=list[RecommendationItem])
 def recommend_hybrid(payload: RecommendHybridRequest):
-    if not payload.image and not payload.query:
-        raise HTTPException(status_code=422, detail="Provide at least one of image or query")
-
-    vectors = []
+    image_vec = None
     if payload.image:
         image = _decode_image(payload.image)
-        vectors.append(app.state.encoder.encode_pil(image))
-    if payload.query:
-        vectors.append(app.state.encoder.encode_text(payload.query))
+        image_vec = app.state.encoder.encode_pil(image)
 
-    query_vec = np.mean(np.stack(vectors, axis=0), axis=0).astype(np.float32)
-    norm = np.linalg.norm(query_vec)
-    if norm > 0:
-        query_vec = query_vec / norm
+    text_vec = None
+    if payload.query:
+        text_vec = app.state.encoder.encode_text(payload.query)
+
+    query_vec = _build_hybrid_query_vector(image_vec=image_vec, text_vec=text_vec)
 
     return _recommend_from_query(payload.user_id, query_vec, payload.top_k)
 

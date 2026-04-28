@@ -39,6 +39,8 @@ TRANSFORMER_HEADS = 8
 # Fusion (Phase 1)
 USER_WEIGHT = 0.6
 IMAGE_WEIGHT = 0.4
+HYBRID_IMAGE_WEIGHT = 0.5
+HYBRID_TEXT_WEIGHT = 0.5
 
 # Training placeholders (Phase 2)
 LEARNING_RATE = 1e-4

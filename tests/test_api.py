@@ -1,17 +1,26 @@
 from fastapi.testclient import TestClient
 import pytest
+from io import BytesIO
+import base64
 
 from api.main import app
 import numpy as np
+from PIL import Image
 
 
 class _DummyEncoder:
     model = None
 
+    def __init__(self):
+        self.text_calls = 0
+        self.image_calls = 0
+
     def encode_text(self, _query):
+        self.text_calls += 1
         return np.zeros((512,), dtype=np.float32)
 
     def encode_pil(self, _image):
+        self.image_calls += 1
         return np.zeros((512,), dtype=np.float32)
 
 
@@ -69,3 +78,36 @@ def test_phase2_ranker_reorders_candidates(monkeypatch):
         assert len(payload) == 2
         assert payload[0]["product_id"] == "p000001"
         assert payload[0]["score"] > payload[1]["score"]
+
+
+def test_recommend_hybrid_uses_both_modalities(monkeypatch):
+    with TestClient(app) as client:
+        encoder = _DummyEncoder()
+        app.state.phase_mode = "phase1"
+        app.state.use_ranker = False
+        app.state.ranker = None
+        app.state.encoder = encoder
+        app.state.index = object()
+        app.state.item_ids = np.array(["p000000", "p000001"], dtype=str)
+        app.state.item_embeddings = np.zeros((2, 512), dtype=np.float32)
+        app.state.item_id_to_index = {"p000000": 0, "p000001": 1}
+
+        def _fake_retrieve_item_ids(**kwargs):
+            return [("p000000", 0.8), ("p000001", 0.7)]
+
+        monkeypatch.setattr("api.main.retrieve_item_ids", _fake_retrieve_item_ids)
+
+        image = Image.new("RGB", (32, 32), color=(255, 0, 0))
+        buff = BytesIO()
+        image.save(buff, format="PNG")
+        image_b64 = base64.b64encode(buff.getvalue()).decode("utf-8")
+
+        response = client.post(
+            "/recommend/hybrid",
+            json={"user_id": "u00000", "image": image_b64, "query": "red shoes", "top_k": 2},
+        )
+
+        assert response.status_code == 200
+        assert encoder.image_calls == 1
+        assert encoder.text_calls == 1
+        assert len(response.json()) == 2
