@@ -39,6 +39,7 @@ from models.clip_encoder import ClipEncoder
 from models.fusion import fuse
 from models.ranker import Ranker, build_ranking_features
 from models.user_encoder import encode_user
+from retrieval.cache import QueryCache
 from retrieval.faiss_index import load_index
 from retrieval.search import retrieve_item_ids
 
@@ -61,6 +62,7 @@ async def lifespan(app: FastAPI):
     app.state.item_id_to_index = {}
     app.state.index = None
     app.state.ranker = None
+    app.state.query_cache = QueryCache(embedding_ttl_seconds=86400, retrieval_ttl_seconds=3600)
 
     if EMBEDDINGS_PATH.exists() and ITEM_IDS_PATH.exists():
         app.state.item_embeddings = np.load(EMBEDDINGS_PATH).astype(np.float32)
@@ -104,6 +106,11 @@ def _decode_image(b64_image: str) -> Image.Image:
 def _category_to_id(category: str) -> float:
     digest = hashlib.sha256(category.encode("utf-8")).digest()
     return int.from_bytes(digest[:4], "little", signed=False) / 2**32
+
+
+def _compute_query_hash(query_vec: np.ndarray) -> str:
+    """Compute deterministic hash of query vector for caching."""
+    return hashlib.sha256(query_vec.tobytes()).hexdigest()[:16]
 
 
 def _build_hybrid_query_vector(image_vec: np.ndarray | None, text_vec: np.ndarray | None) -> np.ndarray:
@@ -175,12 +182,19 @@ def _recommend_from_query(
         )
         fused_vec = fuse(user_vec=user_vec, image_vec=query_vec)
 
-        retrieved = retrieve_item_ids(
-            index=app.state.index,
-            item_ids=app.state.item_ids,
-            query_vec=fused_vec,
-            k=min(max(top_k, FINAL_TOP_N), 100),
-        )
+        # Try to get retrieval results from cache
+        query_hash = _compute_query_hash(fused_vec)
+        retrieved = app.state.query_cache.get_retrieval(user_id, query_hash, top_k)
+
+        if retrieved is None:
+            # Cache miss: run retrieval and cache the result
+            retrieved = retrieve_item_ids(
+                index=app.state.index,
+                item_ids=app.state.item_ids,
+                query_vec=fused_vec,
+                k=min(max(top_k, FINAL_TOP_N), 100),
+            )
+            app.state.query_cache.set_retrieval(user_id, query_hash, top_k, retrieved)
 
         products: list[Product] = []
         retrieval_scores: list[float] = []
@@ -297,6 +311,19 @@ def log_interaction(payload: InteractionRequest):
         session.add(interaction)
 
     return {"ok": True}
+
+
+@app.get("/cache/stats")
+def get_cache_stats():
+    """Get cache performance statistics."""
+    return app.state.query_cache.stats()
+
+
+@app.post("/cache/clear")
+def clear_cache():
+    """Clear all cache entries."""
+    app.state.query_cache.clear()
+    return {"ok": True, "message": "Cache cleared"}
 
 
 @app.get("/health", response_model=StatusResponse)
