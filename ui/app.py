@@ -32,8 +32,34 @@ with st.sidebar:
     )
     
     st.divider()
+    st.subheader("Comparison Mode")
+    enable_comparison = st.checkbox(
+        "Show Phase1 vs Phase2",
+        value=False,
+        help="Display side-by-side comparison of phase1 and phase2 results"
+    )
+    
+    st.divider()
+    cache_stats = st.checkbox(
+        "Show Cache Stats",
+        value=False,
+        help="Display cache hit rate and performance metrics"
+    )
+    
+    if cache_stats:
+        try:
+            cache_resp = requests.get(f"{API_BASE}/cache/stats", timeout=5)
+            if cache_resp.status_code == 200:
+                stats = cache_resp.json()
+                st.metric("Cache Hit Rate", f"{stats['hit_rate']:.1%}")
+                st.metric("Cache Hits", stats['hits'])
+                st.metric("Retrieval Cache Size", stats['retrieval_cache_size'])
+        except Exception:
+            pass
+    
+    st.divider()
     st.info(
-        f"**Current Status:** Phase={phase_mode}, Ranker={'enabled' if use_ranker else 'disabled'}"
+        f"**Current Status:** Phase={phase_mode}, Ranker={'enabled' if use_ranker else 'disabled'}, Comparison={'enabled' if enable_comparison else 'disabled'}"
     )
 
 user_id = st.text_input("User ID", value="u00000")
@@ -50,16 +76,39 @@ def _img_to_base64(img: Image.Image) -> str:
     return base64.b64encode(buff.getvalue()).decode("utf-8")
 
 
+def _fetch_recommendations(api_base: str, endpoint: str, payload: dict, phase: str, use_ranker: bool):
+    """Fetch recommendations for a specific phase."""
+    params = {"phase_mode": phase, "use_ranker": str(use_ranker).lower()}
+    try:
+        resp = requests.post(f"{api_base}{endpoint}", json=payload, params=params, timeout=30)
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception as exc:
+        st.error(f"Request failed: {exc}")
+        return None
+
+
+def _display_results(results, title, columns=2):
+    """Display recommendation results in a grid."""
+    if not results:
+        st.warning("No recommendations returned.")
+        return
+    
+    st.subheader(title)
+    cols = st.columns(columns)
+    for i, item in enumerate(results):
+        with cols[i % columns]:
+            st.write(f"**{item['title']}**")
+            st.caption(f"Product ID: {item['product_id']}")
+            st.metric("Score", f"{item['score']:.4f}")
+            if item.get("image_url"):
+                st.image(item["image_url"], use_column_width=True)
+
+
 if st.button("Recommend"):
     payload = {"user_id": user_id, "top_k": top_k}
     endpoint = ""
-    
-    # Build query params for phase mode and ranker
-    params = {}
-    if phase_mode:
-        params["phase_mode"] = phase_mode
-    if use_ranker:
-        params["use_ranker"] = str(use_ranker).lower()
 
     if mode == "Image":
         if uploaded is None:
@@ -84,24 +133,37 @@ if st.button("Recommend"):
             payload["query"] = query_text
         endpoint = "/recommend/hybrid"
 
-    try:
-        url = API_BASE + endpoint
-        resp = requests.post(url, json=payload, params=params, timeout=30)
-        if resp.status_code != 200:
-            st.error(f"API error {resp.status_code}: {resp.text}")
-            st.stop()
+    if enable_comparison:
+        # Fetch both phase1 and phase2 results
+        phase1_results = _fetch_recommendations(API_BASE, endpoint, payload, "phase1", False)
+        phase2_results = _fetch_recommendations(API_BASE, endpoint, payload, "phase2", use_ranker)
+        
+        if phase1_results is not None or phase2_results is not None:
+            col1, col2 = st.columns(2)
+            
+            if phase1_results is not None:
+                with col1:
+                    _display_results(phase1_results, "🔵 Phase 1 Results (Weighted Fusion)")
+            
+            if phase2_results is not None:
+                with col2:
+                    _display_results(phase2_results, "🟢 Phase 2 Results (Two-Tower + Ranker)")
+    else:
+        # Fetch results with current phase settings
+        params = {}
+        if phase_mode:
+            params["phase_mode"] = phase_mode
+        if use_ranker:
+            params["use_ranker"] = str(use_ranker).lower()
 
-        results = resp.json()
-        if not results:
-            st.warning("No recommendations returned.")
-        else:
-            cols = st.columns(2)
-            for i, item in enumerate(results):
-                with cols[i % 2]:
-                    st.subheader(item["title"])
-                    st.write(f"Product ID: {item['product_id']}")
-                    st.write(f"Score: {item['score']:.4f}")
-                    st.write(item["image_url"])
+        try:
+            url = API_BASE + endpoint
+            resp = requests.post(url, json=payload, params=params, timeout=30)
+            if resp.status_code != 200:
+                st.error(f"API error {resp.status_code}: {resp.text}")
+                st.stop()
 
-    except Exception as exc:
-        st.error(f"Request failed: {exc}")
+            results = resp.json()
+            if results:
+                title = f"{mode} Recommendations ({phase_mode})"
+                _display_results(results, title)
