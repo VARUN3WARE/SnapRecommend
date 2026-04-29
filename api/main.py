@@ -151,7 +151,17 @@ def _score_candidates_with_ranker(user_vec: np.ndarray, products: list[Product])
         return scores.detach().cpu().numpy().astype(float).tolist()
 
 
-def _recommend_from_query(user_id: str, query_vec: np.ndarray, top_k: int) -> list[RecommendationItem]:
+def _recommend_from_query(
+    user_id: str,
+    query_vec: np.ndarray,
+    top_k: int,
+    phase_mode: str | None = None,
+    use_ranker: bool | None = None,
+) -> list[RecommendationItem]:
+    # Use provided values, fall back to app.state defaults
+    effective_phase_mode = phase_mode or app.state.phase_mode
+    effective_use_ranker = use_ranker if use_ranker is not None else app.state.use_ranker
+    
     if app.state.index is None or len(app.state.item_ids) == 0:
         raise HTTPException(status_code=503, detail="Index not ready. Run pipeline first.")
 
@@ -182,7 +192,7 @@ def _recommend_from_query(user_id: str, query_vec: np.ndarray, top_k: int) -> li
             retrieval_scores.append(float(score))
 
         ranked_scores = None
-        if app.state.phase_mode == "phase2" and app.state.use_ranker:
+        if effective_phase_mode == "phase2" and effective_use_ranker:
             ranked_scores = _score_candidates_with_ranker(user_vec=user_vec, products=products)
 
         if ranked_scores is not None and len(ranked_scores) == len(products):
@@ -203,20 +213,32 @@ def _recommend_from_query(user_id: str, query_vec: np.ndarray, top_k: int) -> li
 
 
 @app.post("/recommend/image", response_model=list[RecommendationItem])
-def recommend_image(payload: RecommendImageRequest):
+def recommend_image(payload: RecommendImageRequest, phase_mode: str | None = None, use_ranker: bool | None = None):
     image = _decode_image(payload.image)
     query_vec = app.state.encoder.encode_pil(image)
-    return _recommend_from_query(payload.user_id, query_vec, payload.top_k)
+    return _recommend_from_query(
+        payload.user_id,
+        query_vec,
+        payload.top_k,
+        phase_mode=phase_mode,
+        use_ranker=use_ranker,
+    )
 
 
 @app.post("/recommend/text", response_model=list[RecommendationItem])
-def recommend_text(payload: RecommendTextRequest):
+def recommend_text(payload: RecommendTextRequest, phase_mode: str | None = None, use_ranker: bool | None = None):
     query_vec = app.state.encoder.encode_text(payload.query)
-    return _recommend_from_query(payload.user_id, query_vec, payload.top_k)
+    return _recommend_from_query(
+        payload.user_id,
+        query_vec,
+        payload.top_k,
+        phase_mode=phase_mode,
+        use_ranker=use_ranker,
+    )
 
 
 @app.post("/recommend/hybrid", response_model=list[RecommendationItem])
-def recommend_hybrid(payload: RecommendHybridRequest):
+def recommend_hybrid(payload: RecommendHybridRequest, phase_mode: str | None = None, use_ranker: bool | None = None):
     image_vec = None
     if payload.image:
         image = _decode_image(payload.image)
@@ -228,7 +250,13 @@ def recommend_hybrid(payload: RecommendHybridRequest):
 
     query_vec = _build_hybrid_query_vector(image_vec=image_vec, text_vec=text_vec)
 
-    return _recommend_from_query(payload.user_id, query_vec, payload.top_k)
+    return _recommend_from_query(
+        payload.user_id,
+        query_vec,
+        payload.top_k,
+        phase_mode=phase_mode,
+        use_ranker=use_ranker,
+    )
 
 
 @app.get("/product/{product_id}")

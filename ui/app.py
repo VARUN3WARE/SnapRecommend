@@ -9,11 +9,32 @@ import requests
 import streamlit as st
 from PIL import Image
 
-API_BASE = st.sidebar.text_input("API Base URL", value="http://localhost:8000")
-
 st.set_page_config(page_title="SnapRecommend", layout="wide")
 st.title("SnapRecommend MVP")
 st.caption("Image + text product recommendations")
+
+# Sidebar: API and phase controls
+with st.sidebar:
+    st.header("Configuration")
+    API_BASE = st.text_input("API Base URL", value="http://localhost:8000")
+    
+    st.divider()
+    st.subheader("Phase 2 Settings")
+    phase_mode = st.selectbox(
+        "Phase Mode",
+        options=["phase1", "phase2"],
+        help="phase1: Legacy weighted fusion. phase2: Two-tower + ranker model."
+    )
+    use_ranker = st.checkbox(
+        "Use Ranker",
+        value=False,
+        help="Enable post-retrieval reranking (requires phase2 mode)."
+    )
+    
+    st.divider()
+    st.info(
+        f"**Current Status:** Phase={phase_mode}, Ranker={'enabled' if use_ranker else 'disabled'}"
+    )
 
 user_id = st.text_input("User ID", value="u00000")
 top_k = st.slider("Top K", min_value=1, max_value=20, value=10)
@@ -32,6 +53,13 @@ def _img_to_base64(img: Image.Image) -> str:
 if st.button("Recommend"):
     payload = {"user_id": user_id, "top_k": top_k}
     endpoint = ""
+    
+    # Build query params for phase mode and ranker
+    params = {}
+    if phase_mode:
+        params["phase_mode"] = phase_mode
+    if use_ranker:
+        params["use_ranker"] = str(use_ranker).lower()
 
     if mode == "Image":
         if uploaded is None:
@@ -57,7 +85,8 @@ if st.button("Recommend"):
         endpoint = "/recommend/hybrid"
 
     try:
-        resp = requests.post(API_BASE + endpoint, json=payload, timeout=30)
+        url = API_BASE + endpoint
+        resp = requests.post(url, json=payload, params=params, timeout=30)
         if resp.status_code != 200:
             st.error(f"API error {resp.status_code}: {resp.text}")
             st.stop()

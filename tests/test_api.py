@@ -111,3 +111,35 @@ def test_recommend_hybrid_uses_both_modalities(monkeypatch):
         assert encoder.image_calls == 1
         assert encoder.text_calls == 1
         assert len(response.json()) == 2
+
+
+def test_recommend_with_phase_mode_query_param(monkeypatch):
+    """Test that phase_mode query parameter overrides app.state setting."""
+    pytest.importorskip("torch")
+
+    with TestClient(app) as client:
+        app.state.phase_mode = "phase1"  # Default phase1
+        app.state.use_ranker = False
+        app.state.ranker = _DummyRanker()
+        app.state.encoder = _DummyEncoder()
+        app.state.index = object()
+        app.state.item_ids = np.array(["p000000", "p000001"], dtype=str)
+        app.state.item_embeddings = np.zeros((2, 512), dtype=np.float32)
+        app.state.item_id_to_index = {"p000000": 0, "p000001": 1}
+
+        def _fake_retrieve_item_ids(**kwargs):
+            return [("p000000", 0.2), ("p000001", 0.9)]
+
+        monkeypatch.setattr("api.main.retrieve_item_ids", _fake_retrieve_item_ids)
+
+        # Request with phase_mode=phase2 and use_ranker=true query params
+        response = client.post(
+            "/recommend/text?phase_mode=phase2&use_ranker=true",
+            json={"user_id": "u00000", "query": "red shoes", "top_k": 2},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert len(payload) == 2
+        # Since ranker returns higher score for p000001, it should be reranked first
+        assert payload[0]["product_id"] == "p000001"
