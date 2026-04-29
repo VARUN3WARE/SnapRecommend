@@ -39,6 +39,14 @@ from models.clip_encoder import ClipEncoder
 from models.fusion import fuse
 from models.ranker import Ranker, build_ranking_features
 from models.user_encoder import encode_user
+from api.metrics import (
+    RecommendationMetrics,
+    record_recommendation_metrics,
+    get_metrics_summary,
+    compute_diversity,
+    compute_coverage,
+    compute_ndcg,
+)
 from retrieval.cache import QueryCache
 from retrieval.faiss_index import load_index
 from retrieval.search import retrieve_item_ids
@@ -324,6 +332,12 @@ def clear_cache():
     """Clear all cache entries."""
     app.state.query_cache.clear()
     return {"ok": True, "message": "Cache cleared"}
+
+
+@app.get("/metrics/summary")
+def get_recommendation_metrics(last_n: int = 100):
+    """Get recommendation quality metrics summary."""
+    return get_metrics_summary(last_n=last_n)
 
 
 @app.get("/health", response_model=StatusResponse)
