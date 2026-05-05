@@ -21,7 +21,8 @@ Optional (recommended for full quality):
 pip install git+https://github.com/openai/CLIP.git
 # plus FAISS GPU via conda
 ```
-
+ 
+  
 ## 2. Run Data Pipeline
 
 ```bash
