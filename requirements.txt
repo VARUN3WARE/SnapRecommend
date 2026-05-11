@@ -10,6 +10,7 @@ tqdm==4.66.2
 pydantic==2.6.0
 pytest==8.1.1
 httpx==0.27.0
+redis==7.4.0
 # Install CLIP separately:
 # pip install git+https://github.com/openai/CLIP.git
 # Install FAISS GPU (preferred) or CPU fallback:
