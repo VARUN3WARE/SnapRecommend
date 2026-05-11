@@ -159,24 +159,116 @@ The system tracks:
 
 Endpoint: `GET /metrics/summary?last_n=100`
 
-## 9. Deployment
+## 9. Database Configuration
+
+### SQLite (Development Default)
+
+The system defaults to SQLite in `data/snaprecommend.db` for development:
+```bash
+# No configuration needed; works out-of-the-box
+python pipeline/simulate_users.py
+# ...
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+### PostgreSQL (Production)
+
+#### Setup PostgreSQL
+
+```bash
+# Install PostgreSQL (macOS)
+brew install postgresql@15
+
+# Or Ubuntu/Debian
+sudo apt-get install postgresql postgresql-contrib
+
+# Start PostgreSQL
+pg_ctl -D /usr/local/var/postgres start  # macOS
+# or
+sudo service postgresql start  # Linux
+```
+
+#### Configure Connection
+
+Create a PostgreSQL database:
+```bash
+createdb snaprecommend_prod
+```
+
+Set the environment variable:
+```bash
+export DATABASE_URL="postgresql://username:password@localhost:5432/snaprecommend_prod"
+```
+
+Or update `.env`:
+```bash
+DATABASE_URL=postgresql://username:password@localhost:5432/snaprecommend_prod
+```
+
+#### Run with PostgreSQL
+
+```bash
+# Initialize database schema
+python -c "from api.db import init_db; init_db()"
+
+# Run data pipeline
+python pipeline/simulate_users.py
+python pipeline/embed_items.py
+# ... rest of pipeline
+
+# Start API
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+#### Docker Compose with PostgreSQL
+
+```bash
+# Create .env file
+cat > .env << EOF
+DATABASE_URL=postgresql://snapuser:snappass@postgres:5432/snaprecommend
+PHASE_MODE=phase2
+USE_RANKER=true
+EOF
+
+# Start services
+docker-compose up -d
+
+# Initialize database
+docker-compose exec api python -c "from api.db import init_db; init_db()"
+
+# Run pipeline inside container
+docker-compose exec api python pipeline/simulate_users.py
+docker-compose exec api python pipeline/embed_items.py
+# ... etc
+```
+
+### Connection String Formats
+
+| Database | URL Format |
+|----------|-----------|
+| SQLite (dev) | `sqlite:///data/snaprecommend.db` |
+| PostgreSQL | `postgresql://user:password@host:port/dbname` |
+| PostgreSQL (psycopg3) | `postgresql+psycopg://user:password@host:port/dbname` |
+
+## 10. Deployment
 
 ### Production Checklist
 
 - [ ] Set `PHASE_MODE = "phase2"`, `USE_RANKER = True` in config
-- [ ] Update `.env` with production API keys/tokens
-- [ ] Configure PostgreSQL connection in `config.py`
+- [ ] Update `.env` with `DATABASE_URL` pointing to PostgreSQL
 - [ ] Enable CLIP via `pip install git+https://github.com/openai/CLIP.git`
 - [ ] Set up FAISS GPU if available
 - [ ] Run health check: `curl http://{host}:8000/health`
 - [ ] Test API endpoints before load testing
+- [ ] Configure PostgreSQL backups and connection pooling (PgBouncer)
 
 ### Scaling Considerations
 
-- **Horizontal**: Run multiple API instances behind load balancer
-- **Caching**: Move from in-memory to Redis for distributed cache
-- **Database**: PostgreSQL for multi-node consistency
+- **Horizontal**: Run multiple API instances behind load balancer (e.g., Nginx, HAProxy)
+- **Caching**: Move from in-memory to Redis for distributed cache across multiple API instances
+- **Database**: PostgreSQL with connection pooling for multi-node consistency
 - **Search**: FAISS GPU for faster retrieval at scale
+- **Monitoring**: Set up Prometheus + Grafana for metrics collection and dashboards
 
 ## Notes
 
