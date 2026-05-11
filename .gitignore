@@ -26,6 +26,7 @@ Thumbs.db
 # Local environment files
 .env
 .env.*
+!.env.example
 
 # Build artifacts
 dist/
@@ -33,6 +34,7 @@ build/
 *.egg-info/
 
 # Data artifacts (keep folder structure, ignore heavy generated files)
+data/images/
 data/processed/*.npy
 data/processed/*.index
 data/processed/*.faiss

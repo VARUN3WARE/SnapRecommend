@@ -103,6 +103,81 @@ streamlit run ui/app.py
 pytest -q
 ```
 
+## 6. Docker & Containerization
+
+### Build Docker Image
+
+```bash
+docker build -t snaprecommend:latest .
+```
+
+### Run API in Docker
+
+```bash
+docker run -p 8000:8000 snaprecommend:latest
+```
+
+### Run Full Stack with Docker Compose
+
+```bash
+# Start all services (API, UI, optional PostgreSQL)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f api
+
+# Stop all services
+docker-compose down
+```
+
+Services:
+- **API**: `http://localhost:8000` (with /health endpoint)
+- **Streamlit UI**: `http://localhost:8501`
+- **PostgreSQL**: `localhost:5432` (optional, for production)
+
+## 7. CI/CD Pipeline
+
+GitHub Actions automatically:
+- **Tests**: Runs pytest on Python 3.10, 3.11, 3.12
+- **Linting**: Flake8, mypy, black, isort, pylint
+- **Code Quality**: Type checking and coverage reports
+- **Docker Build**: Builds image on main branch push
+- **Artifacts**: Uploads coverage reports to Actions
+
+Trigger: Every push and pull request to `main` or `develop` branches.
+
+View workflow: `.github/workflows/ci.yml`
+
+## 8. Performance Metrics
+
+The system tracks:
+- **NDCG**: Normalized Discounted Cumulative Gain (ranking quality)
+- **Diversity**: Pairwise distance between recommendations
+- **Coverage**: Catalog coverage percentage
+- **Latency**: Query response time (ms)
+- **Cache Hit Rate**: Retrieval cache performance
+
+Endpoint: `GET /metrics/summary?last_n=100`
+
+## 9. Deployment
+
+### Production Checklist
+
+- [ ] Set `PHASE_MODE = "phase2"`, `USE_RANKER = True` in config
+- [ ] Update `.env` with production API keys/tokens
+- [ ] Configure PostgreSQL connection in `config.py`
+- [ ] Enable CLIP via `pip install git+https://github.com/openai/CLIP.git`
+- [ ] Set up FAISS GPU if available
+- [ ] Run health check: `curl http://{host}:8000/health`
+- [ ] Test API endpoints before load testing
+
+### Scaling Considerations
+
+- **Horizontal**: Run multiple API instances behind load balancer
+- **Caching**: Move from in-memory to Redis for distributed cache
+- **Database**: PostgreSQL for multi-node consistency
+- **Search**: FAISS GPU for faster retrieval at scale
+
 ## Notes
 
 - If CLIP is unavailable, the code uses deterministic embeddings to keep the pipeline runnable.
