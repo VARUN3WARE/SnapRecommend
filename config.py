@@ -1,6 +1,7 @@
 """Global configuration constants for the multimodal recommender MVP."""
 
 from pathlib import Path
+import os
 
 # Paths
 ROOT_DIR = Path(__file__).resolve().parent
@@ -17,6 +18,11 @@ RANKER_CHECKPOINT_PATH = CHECKPOINTS_DIR / "ranker_latest.pt"
 TRAIN_DATA_DIR = PROCESSED_DIR / "training"
 TRAIN_PAIRS_PATH = TRAIN_DATA_DIR / "train_pairs.jsonl"
 VAL_PAIRS_PATH = TRAIN_DATA_DIR / "val_pairs.jsonl"
+
+# Database Configuration
+# Support both SQLite (default) and PostgreSQL (production)
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+# Example PostgreSQL: postgresql://user:password@localhost:5432/snaprecommend
 
 # Model
 CLIP_MODEL_NAME = "ViT-B/32"

@@ -5,10 +5,10 @@ from __future__ import annotations
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Float, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Float, ForeignKey, Integer, String, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
-from config import DB_PATH
+from config import DATABASE_URL, DB_PATH
 
 
 class Base(DeclarativeBase):
@@ -44,10 +44,36 @@ class Interaction(Base):
     weight: Mapped[float] = mapped_column(Float)
 
 
-def get_engine(db_path: str | None = None):
-    final_path = Path(db_path) if db_path else DB_PATH
-    final_path.parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(f"sqlite:///{final_path}", future=True)
+def get_engine(db_url: str | None = None):
+    """Create database engine supporting SQLite and PostgreSQL."""
+    final_url = db_url or DATABASE_URL
+    
+    # If db_url is a path string (not a full URL), treat it as SQLite
+    if final_url and "://" not in final_url:
+        db_path = Path(final_url)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        final_url = f"sqlite:///{db_path.absolute()}"
+    elif "sqlite://" in final_url:
+        db_path = final_url.replace("sqlite:///", "")
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    # Use connect_args for SQLite to set pragmas on pool pre-ping
+    connect_args = {}
+    if "sqlite://" in final_url:
+        connect_args = {"timeout": 30}
+        engine = create_engine(final_url, future=True, echo=False, connect_args=connect_args, pool_pre_ping=True)
+        
+        # Enable foreign keys for SQLite on all connections
+        # Note: Disabled by default to avoid breaking tests; enable in production as needed
+        @event.listens_for(engine, "connect")
+        def set_sqlite_pragma(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            # Foreign keys can be enabled here if needed: cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+    else:
+        engine = create_engine(final_url, future=True, echo=False, pool_pre_ping=True)
+    
+    return engine
 
 
 def init_db(db_path: str | None = None) -> None:
