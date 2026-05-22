@@ -47,6 +47,9 @@ from api.metrics import (
     compute_coverage,
     compute_ndcg,
 )
+from api.prometheus_metrics import setup_prometheus_metrics
+from api.logging_config import setup_logging, RequestContextMiddleware
+import os
 from retrieval.cache import QueryCache
 from retrieval.faiss_index import load_index
 from retrieval.search import retrieve_item_ids
@@ -98,6 +101,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Multimodal Recommender", version="0.1.0", lifespan=lifespan)
+
+# Setup logging early (keeps tests quiet by default)
+LOG_FORMAT = os.getenv("LOG_FORMAT", "text")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+setup_logging(log_level=LOG_LEVEL, log_format=LOG_FORMAT)
+
+# Add request context middleware for tracing
+app.add_middleware(RequestContextMiddleware)
+
+# Expose Prometheus metrics endpoint if available
+try:
+    setup_prometheus_metrics(app)
+except Exception:
+    # Keep app running even if metrics setup fails
+    pass
 
 
 def _decode_image(b64_image: str) -> Image.Image:

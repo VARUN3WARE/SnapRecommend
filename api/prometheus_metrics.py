@@ -52,6 +52,10 @@ def _init_prometheus_metrics():
     if not PROMETHEUS_AVAILABLE:
         return
 
+    # Avoid duplicate registration in the global CollectorRegistry
+    if REQUEST_COUNT is not None:
+        return
+
     REQUEST_COUNT = Counter(
         "snaprec_requests_total",
         "Total number of recommendation requests",
