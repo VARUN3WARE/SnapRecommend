@@ -135,18 +135,10 @@ Services:
 - **Streamlit UI**: `http://localhost:8501`
 - **PostgreSQL**: `localhost:5432` (optional, for production)
 
-## 7. CI/CD Pipeline
+## 7. CI/CD Status
 
-GitHub Actions automatically:
-- **Tests**: Runs pytest on Python 3.10, 3.11, 3.12
-- **Linting**: Flake8, mypy, black, isort, pylint
-- **Code Quality**: Type checking and coverage reports
-- **Docker Build**: Builds image on main branch push
-- **Artifacts**: Uploads coverage reports to Actions
-
-Trigger: Every push and pull request to `main` or `develop` branches.
-
-View workflow: `.github/workflows/ci.yml`
+CI/CD is paused for now and the GitHub Actions workflow is disabled.
+When you want to bring it back later, re-add a workflow under `.github/workflows/`.
 
 ## 8. Performance Metrics
 
