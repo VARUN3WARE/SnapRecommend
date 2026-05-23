@@ -10,6 +10,16 @@ python -c "from api.db import init_db; init_db()"
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
+Makefile shortcuts:
+
+```bash
+make setup
+make init-db
+make run
+make test
+make smoke
+```
+
 Check health and metrics:
 
 ```bash
