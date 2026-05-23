@@ -3,6 +3,14 @@
 ## Overview
 This session completed the Phase 2 implementation for the SnapRecommend multimodal recommendation system, adding critical production infrastructure, observability, and deployment capabilities. All work maintained 100% test passing rate throughout with 70 comprehensive tests covering all new features.
 
+## May 23, 2026 Closure Update
+- Added `CONTRIBUTING.md` with lightweight contribution workflow and commit conventions.
+- Added `devops/RUNBOOK.md` and `DEPLOY.md` for quick run/deploy instructions.
+- Added `docker-compose.staging.yml` and executable `devops/smoke_test.sh` for staging smoke checks.
+- Added root `Makefile` with common targets: `setup`, `test`, `run`, `init-db`, `smoke`, and docker helpers.
+- CI remains intentionally paused (workflow file removed by request).
+- Docker validation is still pending in this environment because `docker`/`docker-compose` binaries are not available.
+
 ## Session Statistics
 - **Duration**: Single session with 16 commits
 - **Tests Added**: 25 new tests (45 → 70 total, all passing)
