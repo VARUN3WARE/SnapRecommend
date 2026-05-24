@@ -58,4 +58,5 @@ curl http://localhost:8000/metrics
 Notes / Troubleshooting:
 - If `/metrics` returns 500, check `prometheus_client` availability and logs.
 - If index not ready, run pipeline scripts: `python pipeline/embed_items.py && python pipeline/build_index.py`.
+- If Docker reports permission denied on `/var/run/docker.sock`, add your user to the `docker` group or run the command with `sudo`.
 - To re-enable CI/CD: add the workflow file back into `.github/workflows/ci.yml` and push.
