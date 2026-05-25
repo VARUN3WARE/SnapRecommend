@@ -59,4 +59,23 @@ Notes / Troubleshooting:
 - If `/metrics` returns 500, check `prometheus_client` availability and logs.
 - If index not ready, run pipeline scripts: `python pipeline/embed_items.py && python pipeline/build_index.py`.
 - If Docker reports permission denied on `/var/run/docker.sock`, add your user to the `docker` group or run the command with `sudo`.
+If you see "permission denied" when Docker tries to access `/var/run/docker.sock`, run:
+
+```bash
+# Add your user to the docker group (preferred)
+sudo usermod -aG docker $USER
+# Either log out and log back in, or run the following to pick up the new group immediately in this shell:
+newgrp docker
+
+# Or run commands with sudo (less recommended):
+#sudo docker-compose -f docker-compose.staging.yml up -d --build
+```
+
+If you still see permission errors, ensure `/var/run/docker.sock` is owned by group `docker`:
+
+```bash
+ls -l /var/run/docker.sock
+sudo chown root:docker /var/run/docker.sock
+sudo chmod 660 /var/run/docker.sock
+```
 - To re-enable CI/CD: add the workflow file back into `.github/workflows/ci.yml` and push.
