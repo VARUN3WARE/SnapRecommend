@@ -43,7 +43,7 @@ services:
       retries: 5
     ports:
       - "8000:8000"
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    command: ["./devops/wait-for.sh", "postgres:5432", "redis:6379", "--", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 volumes:
   postgres_data:
