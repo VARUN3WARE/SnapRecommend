@@ -16,10 +16,34 @@ if str(ROOT_DIR) not in sys.path:
 from api.db import Product, session_scope
 from config import CLIP_BATCH_SIZE, EMBEDDINGS_PATH, ITEM_IDS_PATH
 from models.clip_encoder import ClipEncoder
+import argparse
+import logging
+
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Encode item images into embeddings using CLIP or fallback")
+    p.add_argument("--device", default="auto", help="Device to run CLIP on: auto|cpu|cuda")
+    return p.parse_args()
 
 
 def main() -> None:
-    encoder = ClipEncoder(device="cuda")
+    args = parse_args()
+
+    # Resolve device: auto -> cuda if available else cpu
+    device = args.device
+    if device == "auto":
+        try:
+            import torch
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            device = "cpu"
+
+    logging.info("Using device for encoding: %s", device)
+    encoder = ClipEncoder(device=device)
 
     with session_scope() as session:
         products = session.execute(select(Product)).scalars().all()
