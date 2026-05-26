@@ -17,3 +17,6 @@ prometheus-client==0.25.0
 # Install FAISS GPU (preferred) or CPU fallback:
 # conda install -c pytorch faiss-gpu=1.7.4
 # or pip install faiss-cpu
+torch>=2.1.0; platform_system != 'Windows'
+# If you need FAISS on CPU, uncomment the following line or install via conda
+# faiss-cpu==1.7.4
