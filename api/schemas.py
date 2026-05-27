@@ -45,3 +45,14 @@ class StatusResponse(BaseModel):
     model: str
     phase_mode: str
     ranker_loaded: bool
+
+
+class DebugRetrieveRequest(BaseModel):
+    query: Optional[str] = None
+    image: Optional[str] = None
+    top_k: int = Field(default=10, ge=1, le=100)
+
+
+class RawRetrievalItem(BaseModel):
+    product_id: str
+    score: float

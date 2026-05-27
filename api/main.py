@@ -21,6 +21,8 @@ from api.schemas import (
     RecommendTextRequest,
     RecommendationItem,
     StatusResponse,
+    DebugRetrieveRequest,
+    RawRetrievalItem,
 )
 from config import (
     EMBEDDINGS_PATH,
@@ -368,3 +370,27 @@ def health():
         phase_mode=str(app.state.phase_mode),
         ranker_loaded=bool(app.state.ranker is not None),
     )
+
+
+@app.post("/debug/retrieve", response_model=list[RawRetrievalItem])
+def debug_retrieve(payload: DebugRetrieveRequest):
+    """Admin endpoint: run raw retrieval using the index without fusion or ranker."""
+    image_vec = None
+    text_vec = None
+    if payload.image:
+        image = _decode_image(payload.image)
+        image_vec = app.state.encoder.encode_pil(image)
+    if payload.query:
+        text_vec = app.state.encoder.encode_text(payload.query)
+
+    if image_vec is None and text_vec is None:
+        raise HTTPException(status_code=422, detail="Provide `image` or `query` in payload")
+
+    # Build a simple query vector (image preferred if both provided)
+    query_vec = image_vec if image_vec is not None else text_vec
+
+    if app.state.index is None or len(app.state.item_ids) == 0:
+        raise HTTPException(status_code=503, detail="Index not ready. Run pipeline first.")
+
+    results = retrieve_item_ids(index=app.state.index, item_ids=app.state.item_ids, query_vec=query_vec, k=payload.top_k)
+    return [RawRetrievalItem(product_id=pid, score=score) for pid, score in results]
