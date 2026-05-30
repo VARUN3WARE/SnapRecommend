@@ -56,6 +56,72 @@ with st.sidebar:
                 st.metric("Retrieval Cache Size", stats['retrieval_cache_size'])
         except Exception:
             pass
+
+    st.divider()
+    st.subheader("Debug / Admin")
+    show_debug = st.checkbox("Show debug controls", value=False)
+    if show_debug:
+        if st.button("Index Stats"):
+            try:
+                resp = requests.get(f"{API_BASE}/debug/index_stats", timeout=5)
+                if resp.status_code == 200:
+                    st.json(resp.json())
+                else:
+                    st.error(f"Index stats failed: {resp.status_code} {resp.text}")
+            except Exception as exc:
+                st.error(f"Index stats request error: {exc}")
+
+        st.markdown("**Raw Retrieval**")
+        dbg_mode = st.radio("Query type", ["text", "image"], horizontal=True)
+        dbg_text = st.text_input("Debug text query") if dbg_mode == "text" else ""
+        dbg_image = st.file_uploader("Debug image", type=["jpg", "jpeg", "png"]) if dbg_mode == "image" else None
+        dbg_topk = st.number_input("Top K", min_value=1, max_value=100, value=10)
+        if st.button("Run Raw Retrieval"):
+            payload = {"top_k": dbg_topk}
+            if dbg_mode == "text":
+                payload["query"] = dbg_text
+            else:
+                if dbg_image is None:
+                    st.error("Upload an image for raw retrieval")
+                else:
+                    img = Image.open(dbg_image).convert("RGB")
+                    payload["image"] = _img_to_base64(img)
+
+            try:
+                resp = requests.post(f"{API_BASE}/debug/retrieve", json=payload, timeout=10)
+                if resp.status_code == 200:
+                    st.table(resp.json())
+                else:
+                    st.error(f"Retrieve failed: {resp.status_code} {resp.text}")
+            except Exception as exc:
+                st.error(f"Retrieve request error: {exc}")
+
+        st.markdown("**Batch Ranker Score**")
+        rank_user = st.text_input("User ID for ranking", value=user_id)
+        rank_pids = st.text_area("Product IDs (comma separated)")
+        if st.button("Run Ranker Score"):
+            pids = [p.strip() for p in rank_pids.split(",") if p.strip()]
+            if not pids:
+                st.error("Provide at least one product id")
+            else:
+                try:
+                    resp = requests.post(f"{API_BASE}/debug/ranker/score", json={"user_id": rank_user, "product_ids": pids}, timeout=10)
+                    if resp.status_code == 200:
+                        st.table(resp.json().get("scored_products", []))
+                    else:
+                        st.error(f"Ranker failed: {resp.status_code} {resp.text}")
+                except Exception as exc:
+                    st.error(f"Ranker request error: {exc}")
+
+        if st.button("Inspect Cache"):
+            try:
+                resp = requests.get(f"{API_BASE}/debug/cache/inspect", timeout=5)
+                if resp.status_code == 200:
+                    st.json(resp.json())
+                else:
+                    st.error(f"Cache inspect failed: {resp.status_code} {resp.text}")
+            except Exception as exc:
+                st.error(f"Cache inspect request error: {exc}")
     
     st.divider()
     st.info(
