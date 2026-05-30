@@ -26,6 +26,9 @@ from api.schemas import (
     IndexStats,
     CacheInspectResponse,
     CacheInspectItem,
+    RankBatchRequest,
+    RankBatchResponse,
+    RankedProduct,
 )
 from config import (
     EMBEDDINGS_PATH,
@@ -187,6 +190,38 @@ def _score_candidates_with_ranker(user_vec: np.ndarray, products: list[Product])
         feature_tensor = torch.tensor(np.stack(features, axis=0), dtype=torch.float32)
         scores = app.state.ranker.score(feature_tensor)
         return scores.detach().cpu().numpy().astype(float).tolist()
+
+
+def _batch_rank_products(user_id: str, product_ids: list[str]) -> list[RankedProduct]:
+    if app.state.ranker is None or torch is None:
+        raise HTTPException(status_code=503, detail="Ranker not ready. Run phase2 training first.")
+
+    if app.state.item_embeddings.size == 0:
+        raise HTTPException(status_code=503, detail="Item embeddings not ready. Run pipeline first.")
+
+    with session_scope() as session:
+        user_vec = encode_user(
+            user_id=user_id,
+            db_session=session,
+            item_id_to_index=app.state.item_id_to_index,
+            item_embeddings=app.state.item_embeddings,
+            mode=app.state.user_encoder_mode,
+        )
+
+        products: list[Product] = []
+        for product_id in product_ids:
+            product = session.get(Product, product_id)
+            if product is not None:
+                products.append(product)
+
+    if not products:
+        raise HTTPException(status_code=404, detail="No matching products found")
+
+    scores = _score_candidates_with_ranker(user_vec=user_vec, products=products)
+    if scores is None or len(scores) != len(products):
+        raise HTTPException(status_code=503, detail="Unable to score candidates with ranker")
+
+    return [RankedProduct(product_id=product.product_id, score=float(score)) for product, score in zip(products, scores)]
 
 
 def _recommend_from_query(
@@ -439,3 +474,10 @@ def debug_cache_inspect(max_keys: int = 50):
         ret_items.append(CacheInspectItem(key=k, created_at=v.created_at, ttl_seconds=v.ttl_seconds))
 
     return CacheInspectResponse(embedding_keys=emb_items, retrieval_keys=ret_items)
+
+
+@app.post("/debug/ranker/score", response_model=RankBatchResponse)
+def debug_ranker_score(payload: RankBatchRequest):
+    """Score a batch of candidate product IDs for a user using the current ranker."""
+    scored_products = _batch_rank_products(user_id=payload.user_id, product_ids=payload.product_ids)
+    return RankBatchResponse(user_id=payload.user_id, scored_products=scored_products)

@@ -30,6 +30,14 @@ class _DummyRanker:
 
         return torch.tensor([0.1, 0.9], dtype=torch.float32)
 
+
+class _BatchDummyRanker:
+    def score(self, features):
+        import torch
+
+        # Return a stable increasing score per row so the endpoint can be validated deterministically.
+        return torch.linspace(0.2, 0.8, steps=features.shape[0], dtype=torch.float32)
+
 def test_health_endpoint():
     with TestClient(app) as client:
         response = client.get("/health")
@@ -143,3 +151,32 @@ def test_recommend_with_phase_mode_query_param(monkeypatch):
         assert len(payload) == 2
         # Since ranker returns higher score for p000001, it should be reranked first
         assert payload[0]["product_id"] == "p000001"
+
+
+def test_debug_batch_ranker_scores_candidates(monkeypatch):
+    pytest.importorskip("torch")
+
+    with TestClient(app) as client:
+        app.state.phase_mode = "phase2"
+        app.state.use_ranker = True
+        app.state.ranker = _BatchDummyRanker()
+        app.state.encoder = _DummyEncoder()
+        app.state.index = object()
+        app.state.item_ids = np.array(["p000000", "p000001", "p000002"], dtype=str)
+        app.state.item_embeddings = np.zeros((3, 512), dtype=np.float32)
+        app.state.item_id_to_index = {"p000000": 0, "p000001": 1, "p000002": 2}
+
+        response = client.post(
+            "/debug/ranker/score",
+            json={"user_id": "u00000", "product_ids": ["p000000", "p000001", "p000002"]},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["user_id"] == "u00000"
+        assert [item["product_id"] for item in payload["scored_products"]] == [
+            "p000000",
+            "p000001",
+            "p000002",
+        ]
+        assert payload["scored_products"][0]["score"] < payload["scored_products"][-1]["score"]

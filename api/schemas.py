@@ -75,3 +75,18 @@ class CacheInspectItem(BaseModel):
 class CacheInspectResponse(BaseModel):
     embedding_keys: list[CacheInspectItem]
     retrieval_keys: list[CacheInspectItem]
+
+
+class RankBatchRequest(BaseModel):
+    user_id: str
+    product_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class RankedProduct(BaseModel):
+    product_id: str
+    score: float
+
+
+class RankBatchResponse(BaseModel):
+    user_id: str
+    scored_products: list[RankedProduct]
