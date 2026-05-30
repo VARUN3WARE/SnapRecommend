@@ -23,6 +23,9 @@ from api.schemas import (
     StatusResponse,
     DebugRetrieveRequest,
     RawRetrievalItem,
+    IndexStats,
+    CacheInspectResponse,
+    CacheInspectItem,
 )
 from config import (
     EMBEDDINGS_PATH,
@@ -394,3 +397,45 @@ def debug_retrieve(payload: DebugRetrieveRequest):
 
     results = retrieve_item_ids(index=app.state.index, item_ids=app.state.item_ids, query_vec=query_vec, k=payload.top_k)
     return [RawRetrievalItem(product_id=pid, score=score) for pid, score in results]
+
+
+@app.get("/debug/index_stats", response_model=IndexStats)
+def debug_index_stats():
+    """Return basic stats about the loaded index and embeddings."""
+    emb_exists = EMBEDDINGS_PATH.exists()
+    faiss_exists = FAISS_INDEX_PATH.exists() or (FAISS_INDEX_PATH.parent / f"{FAISS_INDEX_PATH.name}.npy").exists()
+    emb_shape = None
+    if emb_exists:
+        try:
+            arr = np.load(EMBEDDINGS_PATH)
+            emb_shape = (int(arr.shape[0]), int(arr.shape[1])) if arr.ndim == 2 else None
+        except Exception:
+            emb_shape = None
+
+    return IndexStats(
+        index_size=int(len(app.state.item_ids)),
+        embeddings_path_exists=bool(emb_exists),
+        faiss_index_exists=bool(faiss_exists),
+        embeddings_shape=emb_shape,
+        faiss_path=str(FAISS_INDEX_PATH) if faiss_exists else None,
+    )
+
+
+@app.get("/debug/cache/inspect", response_model=CacheInspectResponse)
+def debug_cache_inspect(max_keys: int = 50):
+    """Inspect cache keys for embeddings and retrievals (limited to `max_keys`)."""
+    qc = app.state.query_cache
+    emb_items = []
+    ret_items = []
+
+    for i, (k, v) in enumerate(qc.embedding_cache.items()):
+        if i >= max_keys:
+            break
+        emb_items.append(CacheInspectItem(key=k, created_at=v.created_at, ttl_seconds=v.ttl_seconds))
+
+    for i, (k, v) in enumerate(qc.retrieval_cache.items()):
+        if i >= max_keys:
+            break
+        ret_items.append(CacheInspectItem(key=k, created_at=v.created_at, ttl_seconds=v.ttl_seconds))
+
+    return CacheInspectResponse(embedding_keys=emb_items, retrieval_keys=ret_items)

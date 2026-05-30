@@ -56,3 +56,22 @@ class DebugRetrieveRequest(BaseModel):
 class RawRetrievalItem(BaseModel):
     product_id: str
     score: float
+
+
+class IndexStats(BaseModel):
+    index_size: int
+    embeddings_path_exists: bool
+    faiss_index_exists: bool
+    embeddings_shape: tuple[int, int] | None = None
+    faiss_path: str | None = None
+
+
+class CacheInspectItem(BaseModel):
+    key: str
+    created_at: float | None = None
+    ttl_seconds: int | None = None
+
+
+class CacheInspectResponse(BaseModel):
+    embedding_keys: list[CacheInspectItem]
+    retrieval_keys: list[CacheInspectItem]
